@@ -42,7 +42,7 @@ This repository accompanies the paper *ECG Simulator for Cardiac Rhythm Visualis
 
 ## Citing this software
 
-   If you use CardioTrace, please cite the archived release on Zenodo: https://doi.org/10.5281/zenodo.23387337. Citation metadata is also available in `CITATION.cff`.
+   If you use CardioTrace, please cite the archived release on Zenodo: https://doi.org/10.5281/zenodo.23390508. Citation metadata is also available in `CITATION.cff`.
 
 ## License
 
