@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CardioTrace — ECG Signal Analysis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+/* ─── TOKENS ─────────────────────────────────────────── */
+:root{
+  --bg:       #0b0f18;
+  --bg2:      #111827;
+  --bg3:      #1a2235;
+  --bg4:      #212d42;
+  --line:     rgba(255,255,255,0.07);
+  --line2:    rgba(255,255,255,0.13);
+  --teal:     #2dd4bf;
+  --teal-dim: rgba(45,212,191,0.12);
+  --teal-mid: rgba(45,212,191,0.25);
+  --ink:      #f0f4f8;
+  --ink2:     #94a3b8;
+  --ink3:     #4b5e78;
+  --c-normal: #4ade80;
+  --c-mild:   #60a5fa;
+  --c-warn:   #fbbf24;
+  --c-arr:    #c084fc;
+  --c-crit:   #f87171;
+  --c-fatal:  #ff4d4d;
+  --r:        5px;
+  --ff:       'DM Sans', sans-serif;
+  --ff-serif: 'DM Serif Display', serif;
+  --ff-mono:  'DM Mono', monospace;
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;font-size:15px;}
+body{background:var(--bg);color:var(--ink);font-family:var(--ff);overflow-x:hidden;line-height:1.6;}
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--teal);border-radius:2px;}
+
+/* ─── PAGES ──────────────────────────────────────────── */
+.page{display:none;}
+.page.active{display:block;}
+#page-analyser.active{display:flex;flex-direction:column;height:100vh;overflow:hidden;}
+
+/* ─── NAV ────────────────────────────────────────────── */
+.nav{
+  position:fixed;inset:0 0 auto;z-index:200;height:60px;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 40px;
+  background:rgba(11,15,24,0.9);backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--line);
+}
+.nav-logo{
+  display:flex;align-items:center;gap:10px;cursor:pointer;
+  text-decoration:none;
+}
+.logo-mark{
+  width:30px;height:30px;background:var(--teal);border-radius:6px;
+  display:flex;align-items:center;justify-content:center;
+}
+.logo-mark svg{width:18px;height:18px;}
+.logo-name{
+  font-family:var(--ff);font-weight:600;font-size:15px;
+  letter-spacing:0.04em;color:var(--ink);
+}
+.logo-name span{color:var(--teal);}
+.nav-links{display:flex;align-items:center;gap:4px;}
+.nav-link{
+  background:none;border:none;cursor:pointer;
+  font-family:var(--ff);font-size:13.5px;font-weight:400;
+  color:var(--ink2);padding:6px 14px;border-radius:var(--r);
+  transition:all 0.18s;
+}
+.nav-link:hover{color:var(--ink);background:rgba(255,255,255,0.05);}
+.nav-link.active-link{color:var(--teal);}
+.nav-btn{
+  background:var(--teal);color:#0b0f18;
+  border:none;cursor:pointer;
+  font-family:var(--ff);font-size:13px;font-weight:600;
+  padding:8px 20px;border-radius:var(--r);
+  display:flex;align-items:center;gap:7px;
+  transition:all 0.18s;letter-spacing:0.02em;
+}
+.nav-btn:hover{background:#5eead4;transform:translateY(-1px);}
+.nav-btn svg{width:14px;height:14px;}
+
+/* ─── HERO ───────────────────────────────────────────── */
+.hero{
+  min-height:100vh;padding-top:60px;
+  display:flex;flex-direction:column;
+  background:var(--bg);position:relative;overflow:hidden;
+}
+.hero-grid{
+  position:absolute;inset:0;
+  background-image:
+    linear-gradient(rgba(45,212,191,0.04) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(45,212,191,0.04) 1px,transparent 1px);
+  background-size:44px 44px;
+}
+.hero-glow{
+  position:absolute;top:-120px;left:50%;transform:translateX(-50%);
+  width:700px;height:400px;
+  background:radial-gradient(ellipse,rgba(45,212,191,0.08) 0%,transparent 70%);
+  pointer-events:none;
+}
+.hero-inner{
+  flex:1;display:flex;flex-direction:column;justify-content:center;
+  padding:80px 40px 40px;max-width:1100px;margin:0 auto;width:100%;
+  position:relative;z-index:1;
+}
+.hero-chip{
+  display:inline-flex;align-items:center;gap:8px;
+  background:var(--teal-dim);border:1px solid var(--teal-mid);
+  border-radius:20px;padding:5px 14px;margin-bottom:28px;
+  font-family:var(--ff-mono);font-size:11px;color:var(--teal);letter-spacing:0.08em;
+  width:fit-content;
+}
+.chip-dot{width:6px;height:6px;border-radius:50%;background:var(--teal);animation:pulse 1.6s ease infinite;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:0.4;transform:scale(0.7);}}
+.hero-h1{
+  font-family:var(--ff-serif);font-size:clamp(46px,6.5vw,88px);
+  line-height:1.0;font-weight:400;color:var(--ink);
+  margin-bottom:24px;letter-spacing:-0.02em;
+}
+.hero-h1 em{font-style:italic;color:var(--teal);}
+.hero-p{
+  font-family:var(--ff);font-size:17px;font-weight:300;
+  color:var(--ink2);max-width:560px;margin-bottom:40px;line-height:1.7;
+}
+.hero-cta{display:flex;gap:14px;flex-wrap:wrap;}
+.btn-primary{
+  background:var(--teal);color:#0b0f18;
+  border:none;cursor:pointer;
+  font-family:var(--ff);font-size:14px;font-weight:600;
+  padding:13px 28px;border-radius:var(--r);
+  display:inline-flex;align-items:center;gap:8px;
+  transition:all 0.18s;letter-spacing:0.01em;
+}
+.btn-primary:hover{background:#5eead4;transform:translateY(-2px);box-shadow:0 8px 24px rgba(45,212,191,0.25);}
+.btn-primary svg{width:16px;height:16px;}
+.btn-ghost{
+  background:transparent;color:var(--ink2);
+  border:1px solid var(--line2);cursor:pointer;
+  font-family:var(--ff);font-size:14px;font-weight:400;
+  padding:13px 28px;border-radius:var(--r);
+  transition:all 0.18s;
+}
+.btn-ghost:hover{border-color:var(--teal);color:var(--teal);}
+
+.hero-stats{
+  display:flex;gap:0;
+  border-top:1px solid var(--line);
+  border-bottom:1px solid var(--line);
+  margin-top:40px;
+}
+.hero-stat{
+  flex:1;padding:20px 0;
+  border-right:1px solid var(--line);
+}
+.hero-stat:last-child{border-right:none;}
+.stat-n{
+  font-family:var(--ff-serif);font-size:32px;font-weight:400;
+  color:var(--teal);line-height:1;margin-bottom:4px;
+}
+.stat-l{font-family:var(--ff-mono);font-size:10px;color:var(--ink3);letter-spacing:0.1em;text-transform:uppercase;}
+
+.hero-ecg-wrap{
+  position:relative;border-top:1px solid rgba(45,212,191,0.15);
+  background:linear-gradient(to bottom,rgba(45,212,191,0.03),transparent);
+}
+.hero-ecg-wrap canvas{display:block;width:100%!important;height:100px!important;}
+
+/* ─── SECTIONS ───────────────────────────────────────── */
+.section{padding:90px 40px;}
+.section-inner{max-width:1100px;margin:0 auto;}
+.section-chip{
+  font-family:var(--ff-mono);font-size:10px;letter-spacing:0.16em;
+  text-transform:uppercase;color:var(--teal);
+  display:flex;align-items:center;gap:10px;margin-bottom:16px;
+}
+.section-chip::before{content:'';width:20px;height:1px;background:var(--teal);}
+.section-h2{
+  font-family:var(--ff-serif);font-size:clamp(30px,4vw,50px);
+  font-weight:400;color:var(--ink);letter-spacing:-0.02em;
+  line-height:1.1;margin-bottom:14px;
+}
+.section-h2 em{font-style:italic;color:var(--teal);}
+.section-lead{
+  font-family:var(--ff);font-size:16px;font-weight:300;
+  color:var(--ink2);max-width:540px;line-height:1.75;
+}
+
+/* ─── ABOUT ──────────────────────────────────────────── */
+.about{background:var(--bg2);}
+.about-grid{display:grid;grid-template-columns:1fr 1fr;gap:72px;align-items:center;margin-top:56px;}
+.wave-facts{margin-top:36px;}
+.wave-fact{display:flex;gap:18px;padding:20px 0;border-bottom:1px solid var(--line);}
+.wave-fact:first-child{border-top:1px solid var(--line);}
+.wf-letter{
+  font-family:var(--ff-serif);font-size:38px;font-weight:400;
+  color:var(--teal);line-height:1;flex-shrink:0;width:56px;
+}
+.wf-body h4{
+  font-family:var(--ff);font-weight:600;font-size:13px;
+  letter-spacing:0.05em;text-transform:uppercase;color:var(--ink);margin-bottom:4px;
+}
+.wf-body p{font-size:13.5px;color:var(--ink2);font-weight:300;line-height:1.6;}
+
+/* Anatomy card */
+.anatomy-card{
+  background:var(--bg3);border:1px solid var(--line);
+  border-radius:10px;padding:28px;
+}
+.anatomy-card-title{
+  font-family:var(--ff-mono);font-size:10px;letter-spacing:0.14em;
+  text-transform:uppercase;color:var(--teal);margin-bottom:18px;
+}
+.anatomy-canvas{position:relative;height:200px;}
+.anatomy-labels{
+  display:flex;justify-content:space-around;margin-top:14px;
+  border-top:1px solid var(--line);padding-top:14px;
+}
+.anatomy-lbl{text-align:center;}
+.anatomy-lbl strong{display:block;font-family:var(--ff-serif);font-size:20px;color:var(--teal);font-weight:400;line-height:1;}
+.anatomy-lbl span{font-family:var(--ff-mono);font-size:9px;color:var(--ink3);letter-spacing:0.08em;text-transform:uppercase;}
+
+/* ─── ANALYSER CTA ───────────────────────────────────── */
+.analyser-cta{
+  background:var(--bg);border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+  padding:80px 40px;text-align:center;position:relative;overflow:hidden;
+}
+.analyser-cta .hero-grid{opacity:0.6;}
+.cta-inner{position:relative;z-index:1;max-width:600px;margin:0 auto;}
+.cta-h2{
+  font-family:var(--ff-serif);font-size:clamp(32px,4vw,52px);
+  font-weight:400;color:var(--ink);letter-spacing:-0.02em;
+  line-height:1.1;margin-bottom:16px;
+}
+.cta-h2 em{font-style:italic;color:var(--teal);}
+.cta-p{font-size:16px;font-weight:300;color:var(--ink2);margin-bottom:32px;line-height:1.7;}
+.cta-pills{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:32px;}
+.cta-pill{
+  background:var(--bg3);border:1px solid var(--line2);border-radius:20px;
+  padding:5px 14px;font-family:var(--ff-mono);font-size:11px;color:var(--ink3);
+  letter-spacing:0.06em;
+}
+
+/* ─── CONDITIONS ─────────────────────────────────────── */
+.conditions{background:var(--bg2);}
+.cond-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);
+  gap:1px;background:var(--line);border:1px solid var(--line);
+  border-radius:10px;overflow:hidden;margin-top:48px;
+}
+.cond-card{
+  background:var(--bg2);padding:24px;cursor:pointer;
+  transition:background 0.2s;position:relative;
+}
+.cond-card:hover{background:var(--bg3);}
+.cond-card-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.cond-sev{
+  font-family:var(--ff-mono);font-size:9px;letter-spacing:0.1em;
+  text-transform:uppercase;display:flex;align-items:center;gap:5px;
+}
+.sev-dot{width:5px;height:5px;border-radius:50%;}
+.cond-cat{font-family:var(--ff-mono);font-size:9px;color:var(--ink3);letter-spacing:0.06em;}
+.cond-name{font-family:var(--ff-serif);font-size:20px;font-weight:400;color:var(--ink);margin-bottom:6px;line-height:1.2;}
+.cond-key{font-size:12.5px;color:var(--ink3);line-height:1.5;}
+.cond-mini{position:relative;height:50px;margin-top:14px;opacity:0.65;}
+.cond-mini canvas{width:100%!important;height:50px!important;}
+.cond-card-border{position:absolute;bottom:0;left:0;right:0;height:2px;transform:scaleX(0);transform-origin:left;transition:transform 0.22s;}
+.cond-card:hover .cond-card-border{transform:scaleX(1);}
+
+/* ─── HOW ────────────────────────────────────────────── */
+.how{background:var(--bg3);}
+.steps-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-top:56px;position:relative;}
+.steps-grid::before{
+  content:'';position:absolute;top:26px;left:12%;right:12%;
+  height:1px;background:rgba(45,212,191,0.2);z-index:0;
+}
+.step{padding:0 20px;position:relative;z-index:1;}
+.step-num{
+  width:52px;height:52px;border-radius:50%;
+  border:1px solid rgba(45,212,191,0.3);background:var(--bg3);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--ff-serif);font-size:22px;color:var(--teal);
+  margin-bottom:20px;
+}
+.step h4{font-family:var(--ff);font-weight:600;font-size:13.5px;color:var(--ink);margin-bottom:8px;}
+.step p{font-size:13px;color:var(--ink3);line-height:1.65;}
+
+/* ─── OVERVIEW ───────────────────────────────────────── */
+.overview{background:var(--bg2);}
+.overview-grid{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:start;margin-top:48px;}
+.sev-legend{margin-top:20px;}
+.sev-lrow{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line);}
+.sev-lrow:last-child{border-bottom:none;}
+.sev-sw{width:9px;height:9px;border-radius:2px;flex-shrink:0;}
+.sev-lname{font-size:13px;font-weight:500;color:var(--ink);flex:1;letter-spacing:0.02em;}
+.sev-lcount{font-family:var(--ff-mono);font-size:11px;color:var(--ink3);}
+.overview-chart-wrap{position:relative;height:340px;}
+
+/* ─── FOOTER ─────────────────────────────────────────── */
+.footer{
+  background:var(--bg);border-top:1px solid var(--line);
+  padding:32px 40px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.footer-logo{display:flex;align-items:center;gap:10px;}
+.footer-logo-name{font-family:var(--ff);font-weight:600;font-size:14px;color:var(--ink);}
+.footer-logo-name span{color:var(--teal);}
+.footer-note{font-family:var(--ff-mono);font-size:10px;color:var(--ink3);letter-spacing:0.06em;}
+.footer-right{font-family:var(--ff-mono);font-size:10px;color:var(--ink3);text-align:right;line-height:1.6;}
+
+/* ─── ANALYSER PAGE ──────────────────────────────────── */
+#page-analyser{background:var(--bg);}
+.a-topbar{
+  height:52px;min-height:52px;
+  background:var(--bg2);border-bottom:1px solid var(--line);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 18px;flex-shrink:0;
+}
+.a-topbar-left{display:flex;align-items:center;gap:14px;}
+.back-btn{
+  display:inline-flex;align-items:center;gap:6px;
+  background:none;border:1px solid var(--line2);border-radius:4px;
+  padding:6px 12px;cursor:pointer;
+  font-family:var(--ff-mono);font-size:10px;letter-spacing:0.08em;
+  color:var(--ink2);transition:all 0.18s;
+}
+.back-btn:hover{color:var(--teal);border-color:var(--teal-mid);}
+.back-btn svg{width:12px;height:12px;}
+.a-topbar-title{
+  font-family:var(--ff);font-weight:600;font-size:13px;
+  color:var(--ink);display:flex;align-items:center;gap:8px;
+}
+.live-dot{
+  width:6px;height:6px;border-radius:50%;background:var(--teal);
+  animation:pulse 1.4s ease infinite;
+}
+.a-topbar-right{display:flex;align-items:center;gap:10px;}
+.a-tag{
+  font-family:var(--ff-mono);font-size:9px;letter-spacing:0.1em;
+  padding:4px 10px;border:1px solid var(--teal-mid);
+  border-radius:3px;color:var(--teal);
+}
+.a-count{font-family:var(--ff-mono);font-size:10px;color:var(--ink3);}
+
+/* Analyser body */
+.a-body{display:flex;flex:1;overflow:hidden;}
+
+/* Sidebar */
+.a-sidebar{
+  width:252px;min-width:252px;background:var(--bg2);
+  border-right:1px solid var(--line);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+.a-search-wrap{padding:10px;border-bottom:1px solid var(--line);}
+.a-search{
+  width:100%;background:var(--bg3);border:1px solid var(--line);
+  border-radius:4px;padding:8px 10px;
+  font-family:var(--ff);font-size:13px;color:var(--ink);
+  outline:none;transition:border 0.18s;
+}
+.a-search::placeholder{color:var(--ink3);}
+.a-search:focus{border-color:var(--teal-mid);}
+.a-cond-list{flex:1;overflow-y:auto;padding:4px 0 12px;}
+.a-cat-head{
+  padding:12px 14px 5px;
+  font-family:var(--ff-mono);font-size:9px;letter-spacing:0.16em;
+  text-transform:uppercase;color:var(--ink3);
+}
+.a-cond-btn{
+  display:flex;align-items:center;gap:9px;
+  padding:8px 14px;width:100%;text-align:left;
+  background:none;border:none;cursor:pointer;
+  transition:background 0.12s;position:relative;
+}
+.a-cond-btn:hover{background:rgba(255,255,255,0.03);}
+.a-cond-btn.active{background:var(--teal-dim);}
+.a-cond-btn.active::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--teal);border-radius:0 1px 1px 0;}
+.a-cdot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.a-cname{font-family:var(--ff);font-size:12.5px;color:var(--ink2);flex:1;line-height:1.3;}
+.a-cond-btn.active .a-cname{color:var(--ink);}
+.a-stag{font-family:var(--ff-mono);font-size:8px;padding:2px 5px;border-radius:2px;flex-shrink:0;letter-spacing:0.04em;}
+
+/* Main panel */
+.a-main{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg);}
+.a-header{
+  background:var(--bg2);border-bottom:1px solid var(--line);
+  padding:14px 22px;display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;
+}
+.a-h-left{}
+.a-title{font-family:var(--ff-serif);font-size:22px;font-weight:400;color:var(--ink);line-height:1;}
+.a-meta{font-family:var(--ff-mono);font-size:9.5px;color:var(--ink3);letter-spacing:0.08em;margin-top:3px;}
+.a-sev-badge{
+  padding:6px 14px;border-radius:4px;
+  font-family:var(--ff-mono);font-size:10px;letter-spacing:0.1em;
+  font-weight:500;text-transform:uppercase;
+}
+
+/* Metrics */
+.a-metrics{
+  display:grid;grid-template-columns:repeat(4,1fr);
+  border-bottom:1px solid var(--line);background:var(--bg2);flex-shrink:0;
+}
+.a-metric{padding:12px 20px;border-right:1px solid var(--line);}
+.a-metric:last-child{border-right:none;}
+.a-mlabel{font-family:var(--ff-mono);font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink3);margin-bottom:3px;}
+.a-mvalue{font-family:var(--ff-serif);font-size:26px;font-weight:400;line-height:1;color:var(--ink);}
+.a-munit{font-family:var(--ff-mono);font-size:9px;color:var(--ink3);}
+
+/* Scroll area */
+.a-scroll{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:14px;}
+
+/* Waveform */
+.wave-card{background:var(--bg2);border:1px solid var(--line);border-radius:var(--r);}
+.wave-card-top{
+  padding:11px 16px;border-bottom:1px solid var(--line);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.wave-card-top span{font-family:var(--ff-mono);font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink3);}
+.wave-card-top em{font-family:var(--ff-mono);font-size:9px;color:var(--teal);font-style:normal;}
+.wave-inner{padding:12px 16px;background:var(--bg3);border-radius:0 0 var(--r) var(--r);position:relative;height:155px;}
+.wave-inner canvas{width:100%!important;height:131px!important;}
+
+/* 3-col grid */
+.a-bot-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+.a-card{background:var(--bg2);border:1px solid var(--line);border-radius:var(--r);padding:16px;}
+.a-card-title{
+  font-family:var(--ff-mono);font-size:9px;letter-spacing:0.14em;
+  text-transform:uppercase;color:var(--ink3);
+  padding-bottom:10px;border-bottom:1px solid var(--line);margin-bottom:12px;
+}
+.feat-item{
+  display:flex;align-items:baseline;gap:8px;
+  padding:6px 0;border-bottom:1px solid var(--line);
+  font-size:13px;color:var(--ink);
+}
+.feat-item:last-child{border-bottom:none;}
+.feat-item::before{content:'—';color:var(--teal);font-size:10px;flex-shrink:0;font-family:var(--ff-mono);}
+.key-note{
+  font-family:var(--ff-serif);font-style:italic;font-size:14.5px;
+  color:var(--ink2);line-height:1.6;margin-top:12px;padding-top:10px;
+  border-top:1px solid var(--line);
+}
+.clinical-body{font-size:13px;color:var(--ink2);line-height:1.7;font-weight:300;}
+.param-trow{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:7px 0;border-bottom:1px solid var(--line);font-size:13px;
+}
+.param-trow:last-child{border-bottom:none;}
+.param-lbl{color:var(--ink3);}
+.param-val{font-family:var(--ff-mono);font-size:11px;color:var(--ink);}
+
+/* RR */
+.rr-wrap{position:relative;height:100px;margin-top:10px;}
+
+/* ─── REVEAL ─────────────────────────────────────────── */
+.reveal{opacity:0;transform:translateY(24px);transition:opacity 0.65s ease,transform 0.65s ease;}
+.reveal.in{opacity:1;transform:none;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:none;}}
+.fu{animation:fadeUp 0.7s ease both;}
+.fu1{animation-delay:0.1s;}.fu2{animation-delay:0.22s;}.fu3{animation-delay:0.34s;}.fu4{animation-delay:0.46s;}
+
+/* ─── RESPONSIVE ─────────────────────────────────────── */
+@media(max-width:960px){
+  .nav{padding:0 18px;}
+  .nav-links{display:none;}
+  .hero-inner,.section,.analyser-cta,.footer{padding-left:18px;padding-right:18px;}
+  .about-grid,.overview-grid{grid-template-columns:1fr;gap:40px;}
+  .cond-grid{grid-template-columns:1fr 1fr;}
+  .steps-grid{grid-template-columns:1fr 1fr;gap:32px;}
+  .steps-grid::before{display:none;}
+  .a-sidebar{display:none;}
+  .a-bot-grid{grid-template-columns:1fr;}
+  .a-metrics{grid-template-columns:repeat(2,1fr);}
+  .footer{flex-direction:column;gap:16px;text-align:center;}
+  .hero-stats{flex-wrap:wrap;}
+  .hero-stat{min-width:calc(50% - 1px);}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ NAV ═══════════════════════════════════════════ -->
+<nav class="nav" id="mainNav">
+  <a class="nav-logo" onclick="showPage('home')" style="cursor:pointer;">
+    <div class="logo-mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#0b0f18" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="2,12 6,12 8,5 10,19 12,11 14,13 16,12 22,12"/>
+      </svg>
+    </div>
+    <span class="logo-name">Cardio<span>Trace</span></span>
+  </a>
+  <div class="nav-links" id="homeLinks">
+    <button class="nav-link" onclick="showPage('home');scrollTo(0,0)">Home</button>
+    <button class="nav-link" onclick="showPage('home');setTimeout(()=>scrollToSection('about'),50)">About</button>
+    <button class="nav-link" onclick="showPage('home');setTimeout(()=>scrollToSection('conditions'),50)">Conditions</button>
+    <button class="nav-link" onclick="showPage('home');setTimeout(()=>scrollToSection('how'),50)">Methodology</button>
+  </div>
+  <button class="nav-btn" id="analyserNavBtn" onclick="openAnalyser(0)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,12 6,12 8,5 10,19 12,11 14,13 16,12 22,12"/></svg>
+    Open Analyser
+  </button>
+</nav>
+
+<!-- ═══ HOME PAGE ══════════════════════════════════════ -->
+<div id="page-home" class="page active">
+
+  <!-- HERO -->
+  <section class="hero" id="home-top">
+    <div class="hero-grid"></div>
+    <div class="hero-glow"></div>
+    <div class="hero-inner">
+      <div class="hero-chip fu"><div class="chip-dot"></div>Advanced cardiac diagnostics platform</div>
+      <h1 class="hero-h1 fu fu1">Reading the<br><em>language</em><br>of the heart.</h1>
+      <p class="hero-p fu fu2">A precision platform for ECG signal interpretation — 15 cardiac conditions, real-time waveform generation, and clinically grounded analysis designed for medical professionals and researchers.</p>
+      <div class="hero-cta fu fu3">
+        <button class="btn-primary" onclick="openAnalyser(0)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="2,12 6,12 8,5 10,19 12,11 14,13 16,12 22,12"/></svg>
+          Open ECG Analyser
+        </button>
+        <button class="btn-ghost" onclick="scrollToSection('about')">Learn the science</button>
+      </div>
+      <div class="hero-stats fu fu4">
+        <div class="hero-stat"><div class="stat-n">15</div><div class="stat-l">Cardiac conditions</div></div>
+        <div class="hero-stat"><div class="stat-n">500 Hz</div><div class="stat-l">Sampling rate</div></div>
+        <div class="hero-stat"><div class="stat-n">~2.5B</div><div class="stat-l">ECGs per year globally</div></div>
+        <div class="hero-stat"><div class="stat-n">12–25%</div><div class="stat-l">Estimated missed diagnosis</div></div>
+      </div>
+    </div>
+    <div class="hero-ecg-wrap"><canvas id="heroEcg"></canvas></div>
+  </section>
+
+  <!-- ABOUT -->
+  <section class="section about" id="about">
+    <div class="section-inner">
+      <div class="section-chip reveal">The science</div>
+      <h2 class="section-h2 reveal">Electrical signals,<br><em>clinical meaning.</em></h2>
+      <div class="about-grid">
+        <div class="reveal">
+          <p class="section-lead">The electrocardiogram records the heart's electrical activity through surface electrodes. Each waveform — P, QRS, T — reflects a discrete electrophysiological event. Deviations from normal morphology carry diagnostic weight that can alter the entire clinical course.</p>
+          <div class="wave-facts">
+            <div class="wave-fact">
+              <div class="wf-letter">P</div>
+              <div class="wf-body">
+                <h4>Atrial depolarisation</h4>
+                <p>Coordinated electrical activation across both atria from the sinoatrial node. Duration 80–120 ms; amplitude &lt; 0.25 mV.</p>
+              </div>
+            </div>
+            <div class="wave-fact">
+              <div class="wf-letter">QRS</div>
+              <div class="wf-body">
+                <h4>Ventricular depolarisation</h4>
+                <p>Rapid depolarisation of both ventricles. Normal duration &lt; 120 ms. Widening indicates conduction pathology or accessory pathway conduction.</p>
+              </div>
+            </div>
+            <div class="wave-fact">
+              <div class="wf-letter">T</div>
+              <div class="wf-body">
+                <h4>Ventricular repolarisation</h4>
+                <p>T wave reflects ventricular recovery. Inversion or prolonged QT may indicate ischaemia, electrolyte disturbance, or channelopathy.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="reveal">
+          <div class="anatomy-card">
+            <div class="anatomy-card-title">Waveform anatomy — Lead II, Normal Sinus Rhythm</div>
+            <div class="anatomy-canvas"><canvas id="anatomyChart"></canvas></div>
+            <div class="anatomy-labels">
+              <div class="anatomy-lbl"><strong>P</strong><span>Atrial depol.</span></div>
+              <div class="anatomy-lbl"><strong>PR</strong><span>AV conduction</span></div>
+              <div class="anatomy-lbl"><strong>QRS</strong><span>Ventricular depol.</span></div>
+              <div class="anatomy-lbl"><strong>ST</strong><span>Plateau</span></div>
+              <div class="anatomy-lbl"><strong>T</strong><span>Repolarisation</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ANALYSER CTA -->
+  <div class="analyser-cta">
+    <div class="hero-grid"></div>
+    <div class="cta-inner">
+      <div class="section-chip reveal" style="justify-content:center;">Interactive tool</div>
+      <h2 class="cta-h2 reveal">Analyse <em>live</em> ECG waveforms.</h2>
+      <p class="cta-p reveal">Select from 15 cardiac conditions. View synthesised ECG strips, diagnostic parameters, and clinical guidance — all in a dedicated full-screen workspace.</p>
+      <div class="cta-pills reveal">
+        <span class="cta-pill">Normal Sinus</span>
+        <span class="cta-pill">Atrial Fibrillation</span>
+        <span class="cta-pill">STEMI</span>
+        <span class="cta-pill">VT / VF</span>
+        <span class="cta-pill">+ 11 more</span>
+      </div>
+      <button class="btn-primary reveal" onclick="openAnalyser(0)" style="margin:0 auto;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="2,12 6,12 8,5 10,19 12,11 14,13 16,12 22,12"/></svg>
+        Launch ECG Analyser
+      </button>
+    </div>
+  </div>
+
+  <!-- CONDITIONS -->
+  <section class="section conditions" id="conditions">
+    <div class="section-inner">
+      <div class="section-chip reveal">All conditions</div>
+      <h2 class="section-h2 reveal">15 cardiac <em>patterns.</em></h2>
+      <p class="section-lead reveal">From benign incidental findings to immediately life-threatening emergencies. Click any card to analyse it in detail.</p>
+      <div class="cond-grid" id="condGrid"></div>
+    </div>
+  </section>
+
+  <!-- HOW -->
+  <section class="section how" id="how">
+    <div class="section-inner">
+      <div class="section-chip reveal">Methodology</div>
+      <h2 class="section-h2 reveal">How the simulation <em>works.</em></h2>
+      <p class="section-lead reveal">Each waveform is mathematically synthesised using Gaussian kernel superposition, rhythm-specific beat timing, and physiologically calibrated parameters from cardiology literature.</p>
+      <div class="steps-grid">
+        <div class="step reveal">
+          <div class="step-num">1</div>
+          <h4>Gaussian Synthesis</h4>
+          <p>Individual waveform components (P, Q, R, S, T) are modelled as Gaussian functions with clinically accurate amplitude and timing for each condition.</p>
+        </div>
+        <div class="step reveal">
+          <div class="step-num">2</div>
+          <h4>Signal Composition</h4>
+          <p>Components are superimposed at physiologically correct intervals — RR spacing, PR duration, and QRS width — reflecting the specific arrhythmia.</p>
+        </div>
+        <div class="step reveal">
+          <div class="step-num">3</div>
+          <h4>Rhythm Modelling</h4>
+          <p>Beats are assembled with condition-specific timing — irregular RR intervals in AF, dropped QRS complexes in Mobitz II — and extra features such as fibrillatory waves, flutter waves, and the WPW delta wave are added where the condition requires them.</p>
+        </div>
+        <div class="step reveal">
+          <div class="step-num">4</div>
+          <h4>Noise Injection</h4>
+          <p>Gaussian white noise at calibrated SNR replicates real-world electrode artefact, making waveforms diagnostically representative.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- OVERVIEW -->
+  <section class="section overview" id="overview">
+    <div class="section-inner">
+      <div class="section-chip reveal">Distribution</div>
+      <h2 class="section-h2 reveal">Conditions by <em>severity.</em></h2>
+      <div class="overview-grid">
+        <div class="reveal">
+          <p class="section-lead">Cardiac arrhythmias span a wide spectrum — from incidental findings requiring no intervention to emergencies demanding immediate resuscitation.</p>
+          <div class="sev-legend">
+            <div class="sev-lrow"><div class="sev-sw" style="background:var(--c-normal)"></div><span class="sev-lname">Normal</span><span class="sev-lcount">1 condition</span></div>
+            <div class="sev-lrow"><div class="sev-sw" style="background:var(--c-mild)"></div><span class="sev-lname">Mild</span><span class="sev-lcount">3 conditions</span></div>
+            <div class="sev-lrow"><div class="sev-sw" style="background:var(--c-warn)"></div><span class="sev-lname">Warning</span><span class="sev-lcount">5 conditions</span></div>
+            <div class="sev-lrow"><div class="sev-sw" style="background:var(--c-arr)"></div><span class="sev-lname">Arrhythmia</span><span class="sev-lcount">2 conditions</span></div>
+            <div class="sev-lrow"><div class="sev-sw" style="background:var(--c-crit)"></div><span class="sev-lname">Critical</span><span class="sev-lcount">3 conditions</span></div>
+            <div class="sev-lrow"><div class="sev-sw" style="background:var(--c-fatal)"></div><span class="sev-lname">Fatal</span><span class="sev-lcount">1 condition</span></div>
+          </div>
+        </div>
+        <div class="reveal">
+          <div class="overview-chart-wrap"><canvas id="overviewChart"></canvas></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="footer-logo">
+      <div class="logo-mark" style="width:26px;height:26px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#0b0f18" stroke-width="2.2" stroke-linecap="round"><polyline points="2,12 6,12 8,5 10,19 12,11 14,13 16,12 22,12"/></svg>
+      </div>
+      <span class="footer-logo-name">Cardio<span>Trace</span></span>
+      <span class="footer-note" style="margin-left:16px;">Educational use only — not a clinical diagnostic tool</span>
+    </div>
+    <div class="footer-right">Waveforms synthesised from peer-reviewed cardiology literature<br>No patient data collected or stored</div>
+  </footer>
+
+</div><!-- /page-home -->
+
+<!-- ═══ ANALYSER PAGE ══════════════════════════════════ -->
+<div id="page-analyser" class="page">
+
+  <!-- Topbar -->
+  <div class="a-topbar">
+    <div class="a-topbar-left">
+      <button class="back-btn" onclick="showPage('home')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12,19 5,12 12,5"/></svg>
+        Back to home
+      </button>
+      <div class="a-topbar-title"><div class="live-dot"></div>ECG Analyser</div>
+    </div>
+    <div class="a-topbar-right">
+      <span class="a-count">15 conditions loaded</span>
+      <span class="a-tag">Lead II · 500 Hz · 25 mm/s</span>
+    </div>
+  </div>
+
+  <!-- Body -->
+  <div class="a-body">
+
+    <!-- Sidebar -->
+    <aside class="a-sidebar">
+      <div class="a-search-wrap">
+        <input class="a-search" type="text" placeholder="Search conditions…" id="aSearch" oninput="filterConditions(this.value)">
+      </div>
+      <div class="a-cond-list" id="aCondList"></div>
+    </aside>
+
+    <!-- Main -->
+    <div class="a-main">
+      <div class="a-header">
+        <div class="a-h-left">
+          <div class="a-title" id="aTitle">Normal Sinus Rhythm</div>
+          <div class="a-meta" id="aMeta">CATEGORY: NORMAL · LEAD II · 25 mm/s · 10 mm/mV</div>
+        </div>
+        <div class="a-sev-badge" id="aSevBadge">NORMAL</div>
+      </div>
+      <div class="a-metrics">
+        <div class="a-metric"><div class="a-mlabel">Heart Rate</div><div class="a-mvalue" id="aHR">72</div><div class="a-munit">bpm</div></div>
+        <div class="a-metric"><div class="a-mlabel">PR Interval</div><div class="a-mvalue" id="aPR">160</div><div class="a-munit">ms</div></div>
+        <div class="a-metric"><div class="a-mlabel">QRS Duration</div><div class="a-mvalue" id="aQRS">&lt;120</div><div class="a-munit">ms</div></div>
+        <div class="a-metric"><div class="a-mlabel">Rhythm</div><div class="a-mvalue" id="aRhythm" style="font-size:16px;margin-top:6px;">Regular</div><div class="a-munit">pattern</div></div>
+      </div>
+      <div class="a-scroll">
+        <!-- Waveform -->
+        <div class="wave-card">
+          <div class="wave-card-top">
+            <span>ECG waveform — 5 second strip · Lead II simulation</span>
+            <em id="waveLabel">Normal Sinus Rhythm</em>
+          </div>
+          <div class="wave-inner"><canvas id="aEcgChart"></canvas></div>
+        </div>
+        <!-- Bottom grid -->
+        <div class="a-bot-grid">
+          <div class="a-card">
+            <div class="a-card-title">Key ECG Features</div>
+            <div id="aFeats"></div>
+            <div class="key-note" id="aKey"></div>
+          </div>
+          <div class="a-card">
+            <div class="a-card-title">Clinical Guidance</div>
+            <div class="clinical-body" id="aClinical"></div>
+          </div>
+          <div>
+            <div class="a-card" style="margin-bottom:12px;">
+              <div class="a-card-title">ECG Parameters</div>
+              <div id="aParams"></div>
+            </div>
+            <div class="a-card">
+              <div class="a-card-title">R-R Interval Distribution</div>
+              <div class="rr-wrap"><canvas id="aRrChart"></canvas></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div><!-- /page-analyser -->
+
+<!-- ═══ JAVASCRIPT ══════════════════════════════════════ -->
+<script>
+/* ── ECG signal generation ── */
+const FS=500,DUR=5,N=FS*DUR;
+const ls=(a,b,n)=>Array.from({length:n},(_,i)=>a+(b-a)*i/(n-1));
+const gauss=(t,mu,sig,amp)=>t.map(x=>amp*Math.exp(-((x-mu)**2)/(2*sig**2)));
+const addV=(a,b)=>a.map((v,i)=>v+(b[i]||0));
+const noise=(s,snr=28)=>{const p=s.reduce((a,v)=>a+v*v,0)/s.length,sd=Math.sqrt(p/10**(snr/10));return s.map(v=>v+sd*(Math.random()+Math.random()+Math.random()+Math.random()-2));};
+const place=(sig,beat,st)=>{for(let i=0;i<beat.length&&st+i<sig.length;i++)sig[st+i]+=beat[i];};
+const comps=(bt,arr)=>{let b=new Array(bt.length).fill(0);arr.forEach(([a,m,s])=>b=addV(b,gauss(bt,m,s,a)));return b;};
+
+function normalBeat(hr=72){
+  const s=new Array(N).fill(0),rr=60/hr;
+  for(let bs=0.3;bs<DUR-rr;bs+=rr){
+    const bt=ls(0,rr,Math.floor(FS*rr));
+    place(s,comps(bt,[[0.15,0.12,0.022],[-0.09,0.22,0.008],[1.20,0.265,0.009],[-0.30,0.305,0.008],[0.28,0.50,0.055]]),Math.floor(bs*FS));
+  }return noise(s);
+}
+function bradyBeat(){const s=new Array(N).fill(0),rr=60/42;for(let bs=0.4;bs<DUR-rr;bs+=rr){const bt=ls(0,rr,Math.floor(FS*rr));place(s,comps(bt,[[0.16,0.14,0.025],[-0.10,0.24,0.009],[1.10,0.28,0.009],[-0.28,0.32,0.008],[0.26,0.56,0.060]]),Math.floor(bs*FS));}return noise(s);}
+function tachyBeat(){const s=new Array(N).fill(0),rr=60/148;for(let bs=0.1;bs<DUR-rr;bs+=rr){const bt=ls(0,rr,Math.floor(FS*rr));place(s,comps(bt,[[0.17,0.08,0.018],[-0.10,0.15,0.007],[1.15,0.19,0.008],[-0.32,0.23,0.007],[0.24,0.38,0.038]]),Math.floor(bs*FS));}return noise(s);}
+function afibBeat(){const t=ls(0,DUR,N);let s=new Array(N).fill(0);[4.2,5.8,7.1,9.3,11.5].forEach(f=>{const ph=Math.random()*6.28;s=s.map((v,i)=>v+0.045*Math.sin(6.28*f*t[i]+ph));});let cur=0.3;while(cur<DUR-0.5){const rr=(60/110)*(0.55+Math.random()*1.15),ph=ls(0,1,Math.floor(FS*0.5));place(s,comps(ph,[[-0.10,0.28,0.008],[1.05,0.32,0.009],[-0.27,0.36,0.008],[0.20,0.65,0.050]]),Math.floor(cur*FS));cur+=rr;}return noise(s);}
+function flutterBeat(){const t=ls(0,DUR,N);let s=new Array(N).fill(0);[1,2,3].forEach(h=>s=s.map((v,i)=>v+(0.18/h)*Math.sin(6.28*5*h*t[i])));const rr=60/150;for(let bs=0.3;bs<DUR-rr;bs+=rr){const ph=ls(0,1,Math.floor(FS*rr));place(s,comps(ph,[[-0.08,0.22,0.008],[1.0,0.26,0.008],[-0.24,0.30,0.007],[0.22,0.55,0.050]]),Math.floor(bs*FS));}return noise(s);}
+function avb1Beat(){const s=new Array(N).fill(0),rr=60/65;for(let bs=0.3;bs<DUR-rr;bs+=rr){const bt=ls(0,rr,Math.floor(FS*rr));place(s,comps(bt,[[0.15,0.10,0.022],[-0.09,0.30,0.008],[1.18,0.34,0.009],[-0.28,0.38,0.008],[0.26,0.60,0.055]]),Math.floor(bs*FS));}return noise(s);}
+function avb2Beat(){const s=new Array(N).fill(0),sRR=60/75,lRR=sRR*2.2;let cur=0.3,bc=0;while(cur<DUR-lRR){const bL=bc%3===2?lRR:sRR,ph=ls(0,1,Math.floor(FS*bL));let b;if(bc%3!==2)b=comps(ph,[[0.15,0.12,0.022],[-0.09,0.22,0.008],[1.15,0.265,0.009],[-0.28,0.305,0.008],[0.26,0.50,0.055]]);else b=gauss(ph,0.08,0.020,0.14);place(s,b,Math.floor(cur*FS));cur+=bL;bc++;}return noise(s);}
+function stemiBeat(){const s=new Array(N).fill(0),rr=60/88;for(let bs=0.3;bs<DUR-rr;bs+=rr){const ph=ls(0,1,Math.floor(FS*rr));const st=ph.map(x=>(x>=0.31&&x<=0.55)?0.40*Math.exp(-((x-0.33)**2)/(2*0.07**2)):0);let b=addV(gauss(ph,0.12,0.022,0.13),st);[[-0.22,0.22,0.008],[0.90,0.26,0.009],[-0.10,0.30,0.007],[0.48,0.65,0.042]].forEach(([a,m,sg])=>b=addV(b,gauss(ph,m,sg,a)));place(s,b,Math.floor(bs*FS));}return noise(s);}
+function nstemiBeat(){const s=new Array(N).fill(0),rr=60/82;for(let bs=0.3;bs<DUR-rr;bs+=rr){const ph=ls(0,1,Math.floor(FS*rr));const dep=ph.map(x=>(x>=0.31&&x<=0.50)?-0.18*Math.exp(-((x-0.35)**2)/(2*0.06**2)):0);let b=addV(gauss(ph,0.12,0.022,0.14),dep);[[-0.12,0.22,0.009],[1.0,0.265,0.009],[-0.22,0.305,0.008],[-0.30,0.58,0.045]].forEach(([a,m,sg])=>b=addV(b,gauss(ph,m,sg,a)));place(s,b,Math.floor(bs*FS));}return noise(s);}
+function vtachBeat(){const s=new Array(N).fill(0),rr=60/170;for(let bs=0.15;bs<DUR-rr;bs+=rr){const ph=ls(0,1,Math.floor(FS*rr));const m=ph.map(x=>1.20*Math.exp(-((x-0.22)**2)/(2*0.045**2))-0.55*Math.exp(-((x-0.38)**2)/(2*0.032**2))+0.25*Math.exp(-((x-0.50)**2)/(2*0.025**2)));place(s,addV(m,gauss(ph,0.72,0.042,-0.38)),Math.floor(bs*FS));}return noise(s,22);}
+function vfibBeat(){const t=ls(0,DUR,N);let s=new Array(N).fill(0);[2.1,3.4,5.2,7.8,11.3,15.6].forEach(f=>{const amp=0.25+Math.random()*0.45,ph=Math.random()*6.28;s=s.map((v,i)=>v+amp*Math.sin(6.28*f*t[i]+ph));});const env=t.map(x=>0.6+0.4*Math.sin(6.28*1.1*x));return noise(s.map((v,i)=>v*env[i]),18);}
+function lbbbBeat(){const s=new Array(N).fill(0),rr=60/70;for(let bs=0.3;bs<DUR-rr;bs+=rr){const ph=ls(0,1,Math.floor(FS*rr));place(s,comps(ph,[[0.16,0.12,0.024],[0.65,0.24,0.014],[0.90,0.32,0.014],[-0.20,0.40,0.010],[-0.32,0.62,0.060]]),Math.floor(bs*FS));}return noise(s);}
+function rbbBeat(){const s=new Array(N).fill(0),rr=60/72;for(let bs=0.3;bs<DUR-rr;bs+=rr){const ph=ls(0,1,Math.floor(FS*rr));place(s,comps(ph,[[0.15,0.12,0.022],[-0.08,0.21,0.008],[1.10,0.25,0.010],[-0.45,0.31,0.012],[0.55,0.37,0.013],[-0.28,0.62,0.055]]),Math.floor(bs*FS));}return noise(s);}
+function wpwBeat(){const s=new Array(N).fill(0),rr=60/80;for(let bs=0.3;bs<DUR-rr;bs+=rr){const ph=ls(0,1,Math.floor(FS*rr));let b=comps(ph,[[0.16,0.10,0.020],[1.05,0.24,0.010],[-0.22,0.28,0.009],[0.25,0.52,0.055]]);const dw=ph.map(x=>(x>=0.17&&x<=0.23)?0.35*Math.sin(Math.PI*(x-0.17)/0.06):0);place(s,addV(b,dw),Math.floor(bs*FS));}return noise(s);}
+function lqtBeat(){const s=new Array(N).fill(0),rr=60/65;for(let bs=0.3;bs<DUR-rr;bs+=rr){const ph=ls(0,1,Math.floor(FS*rr));place(s,comps(ph,[[0.15,0.12,0.022],[-0.09,0.22,0.008],[1.18,0.265,0.009],[-0.28,0.305,0.008],[0.30,0.76,0.075],[0.12,0.88,0.030]]),Math.floor(bs*FS));}return noise(s);}
+
+/* ── Colour system ── */
+const CAT_C={'Normal':'#4ade80','Sinus':'#60a5fa','Atrial':'#c084fc','Conduction':'#fb923c','Ischemia':'#f87171','Ventricular':'#ef4444','Bundle Branch':'#38bdf8','Pre-excitation':'#fbbf24','Channelopathy':'#e879f9'};
+const SEV_C={NORMAL:'#4ade80',MILD:'#60a5fa',WARNING:'#fbbf24',ARRHYTHMIA:'#c084fc',CRITICAL:'#f87171',FATAL:'#ff4d4d'};
+const SEV_BG={NORMAL:'rgba(74,222,128,0.12)',MILD:'rgba(96,165,250,0.12)',WARNING:'rgba(251,191,36,0.12)',ARRHYTHMIA:'rgba(192,132,252,0.12)',CRITICAL:'rgba(248,113,113,0.12)',FATAL:'rgba(255,77,77,0.15)'};
+
+/* ── Conditions data ── */
+const CONDS=[
+  {name:'Normal Sinus Rhythm',fn:normalBeat,cat:'Normal',hr:'60–100',sev:'NORMAL',pr:'120–200 ms',qrs:'< 120 ms',rhythm:'Regular',
+   feats:['Upright P wave in lead II','PR interval 120–200 ms','Narrow QRS < 120 ms','T wave concordant with QRS'],
+   clinical:'Healthy cardiac conduction. No treatment required. Reassure the patient and discharge if asymptomatic.',
+   key:'Regular P before every QRS. Uniform P-P and R-R intervals.'},
+  {name:'Sinus Bradycardia',fn:bradyBeat,cat:'Sinus',hr:'< 60',sev:'MILD',pr:'120–200 ms',qrs:'< 120 ms',rhythm:'Regular (slow)',
+   feats:['Rate < 60 bpm','Normal P-QRS-T morphology','Prolonged R-R intervals','Possible escape beats if severe'],
+   clinical:'Common in athletes and during sleep. Treat only if symptomatic — dizziness, syncope. Consider atropine 0.5 mg IV or temporary pacing.',
+   key:'Normal morphology, rate < 60 bpm. Long R-R intervals.'},
+  {name:'Sinus Tachycardia',fn:tachyBeat,cat:'Sinus',hr:'> 100',sev:'MILD',pr:'< 160 ms',qrs:'< 120 ms',rhythm:'Regular (fast)',
+   feats:['Rate > 100 bpm','P-T wave merging at very high rates','Short R-R intervals','Narrow QRS complex'],
+   clinical:'Physiological response to fever, pain, hypovolaemia, or anxiety. Identify and treat the underlying cause — do not just treat the rate.',
+   key:'Rate > 100 bpm. P waves may merge with preceding T waves.'},
+  {name:'Atrial Fibrillation',fn:afibBeat,cat:'Atrial',hr:'60–180 (irreg)',sev:'ARRHYTHMIA',pr:'Absent',qrs:'< 120 ms',rhythm:'Irregularly irregular',
+   feats:['No visible P waves','Irregularly irregular R-R intervals','Fibrillatory baseline (f-waves)','Narrow QRS unless aberrant conduction'],
+   clinical:'Most common sustained arrhythmia. Stroke risk: anticoagulate per CHA₂DS₂-VASc score. Rate or rhythm control strategy. Cardiology referral.',
+   key:'Irregularly irregular rhythm. No visible P waves. Fibrillatory baseline.'},
+  {name:'Atrial Flutter',fn:flutterBeat,cat:'Atrial',hr:'150 (2:1 block)',sev:'ARRHYTHMIA',pr:'Absent',qrs:'< 120 ms',rhythm:'Regular (2:1)',
+   feats:['Sawtooth flutter waves at ~300 bpm','2:1 or 4:1 AV conduction ratio','Regular ventricular rate','No isoelectric baseline'],
+   clinical:'Cardioversion or catheter ablation preferred. Anticoagulation as per AF guidelines. Rate control with AV nodal blocking agents.',
+   key:'Sawtooth flutter waves at ~300 bpm. Regular ventricular rate (2:1 or 4:1).'},
+  {name:'1° AV Block',fn:avb1Beat,cat:'Conduction',hr:'60–100',sev:'WARNING',pr:'> 200 ms',qrs:'< 120 ms',rhythm:'Regular',
+   feats:['PR > 200 ms (constant)','Every P wave followed by QRS','Normal QRS morphology','Slowed AV nodal conduction'],
+   clinical:'Usually benign, often incidental. Review medications (beta-blockers, digoxin, CCBs). Monitor; no specific treatment usually required.',
+   key:'Prolonged PR interval (> 200 ms). Every P conducts to QRS.'},
+  {name:'2° AV Block (Mobitz II)',fn:avb2Beat,cat:'Conduction',hr:'45–60',sev:'WARNING',pr:'Constant then dropped',qrs:'± wide',rhythm:'Regularly irregular',
+   feats:['Constant PR then sudden dropped QRS','Infra-Hisian block location','2:1 or 3:1 pattern common','Pacemaker often indicated urgently'],
+   clinical:'HIGH RISK of progression to complete heart block. Permanent pacemaker usually required. Does NOT respond to atropine. Urgent cardiology review.',
+   key:'Constant PR interval then sudden non-conducted P wave.'},
+  {name:'STEMI',fn:stemiBeat,cat:'Ischemia',hr:'60–100',sev:'CRITICAL',pr:'120–200 ms',qrs:'≥ 100 ms',rhythm:'Regular (injured)',
+   feats:['ST elevation ≥ 1 mm in ≥ 2 contiguous leads','Pathological Q waves (> 40 ms)','Hyperacute T waves early','Reciprocal ST depression'],
+   clinical:'MEDICAL EMERGENCY. Activate cath lab immediately. PCI within 90 minutes. Aspirin 300 mg + heparin + morphine/O₂/nitrates as indicated.',
+   key:'ST elevation ≥ 1 mm in ≥ 2 contiguous leads. Pathological Q waves.'},
+  {name:'NSTEMI / Ischaemia',fn:nstemiBeat,cat:'Ischemia',hr:'70–100',sev:'CRITICAL',pr:'120–200 ms',qrs:'< 120 ms',rhythm:'Regular',
+   feats:['ST depression ≥ 0.5 mm','T-wave inversion (deep, symmetrical)','No ST elevation present','Troponin elevation confirms NSTEMI vs UA'],
+   clinical:'Urgent: dual antiplatelets + anticoagulation. GRACE score risk stratification. Angiography within 24–72 h. Continuous monitoring in CCU.',
+   key:'ST depression + T-wave inversion without ST elevation. Troponin rise.'},
+  {name:'Ventricular Tachycardia',fn:vtachBeat,cat:'Ventricular',hr:'150–250',sev:'CRITICAL',pr:'Absent / dissociated',qrs:'> 120 ms',rhythm:'Regular (wide)',
+   feats:['Rate > 150 bpm','Wide bizarre QRS > 120 ms','AV dissociation (fusion/capture beats)','Discordant T waves'],
+   clinical:'EMERGENCY. Haemodynamically unstable → immediate DC cardioversion. Stable VT → amiodarone 300 mg IV over 20–60 min. Never give verapamil.',
+   key:'Wide complex tachycardia, QRS > 120 ms. AV dissociation.'},
+  {name:'Ventricular Fibrillation',fn:vfibBeat,cat:'Ventricular',hr:'N/A',sev:'FATAL',pr:'None',qrs:'None',rhythm:'Chaotic / absent',
+   feats:['No organised waveform complexes','Completely chaotic irregular baseline','No measurable rate or intervals','Zero cardiac output — cardiac arrest'],
+   clinical:'CARDIAC ARREST. Immediate CPR (30:2). Defibrillate 200 J biphasic without delay. Adrenaline 1 mg IV every 3–5 min. Advanced Life Support.',
+   key:'Completely chaotic baseline. No organised complexes. No cardiac output.'},
+  {name:'Left Bundle Branch Block',fn:lbbbBeat,cat:'Bundle Branch',hr:'60–100',sev:'WARNING',pr:'Normal',qrs:'> 120 ms',rhythm:'Regular (wide)',
+   feats:['QRS > 120 ms (broad, notched)','M-shaped R in I, aVL, V5–V6 (WiLLiaM)','Discordant ST/T changes','No septal Q waves in I, V5, V6'],
+   clinical:'New LBBB with chest pain = STEMI equivalent — activate cath lab. Investigate underlying structural disease (echo, cardiac MRI).',
+   key:'QRS > 120 ms. Broad notched R in I, aVL, V5–V6. WiLLiaM pattern.'},
+  {name:'Right Bundle Branch Block',fn:rbbBeat,cat:'Bundle Branch',hr:'60–100',sev:'MILD',pr:'Normal',qrs:'> 120 ms',rhythm:'Regular (wide)',
+   feats:['QRS > 120 ms','RSR\' (rabbit ears) in V1','Deep slurred S in I and V6 (MaRRoW)','Discordant T in V1–V2'],
+   clinical:'May be normal incidental finding. If new: investigate right heart — echo for RV pressure, CTPA for pulmonary embolism.',
+   key:'QRS > 120 ms. rsR\' in V1. Deep slurred S in I, V6. MaRRoW pattern.'},
+  {name:'Wolff-Parkinson-White',fn:wpwBeat,cat:'Pre-excitation',hr:'60–100 (SVT bursts)',sev:'WARNING',pr:'< 120 ms (short)',qrs:'Broad (delta)',rhythm:'Regular ± SVT',
+   feats:['Short PR < 120 ms (accessory pathway)','Delta wave (slurred QRS upstroke)','Broad QRS complex','Pseudo ST/T changes (secondary)'],
+   clinical:'Risk of SVT and AF with rapid accessory pathway conduction (→ VF). Catheter ablation is curative. Avoid AV nodal blocking agents in AF with WPW.',
+   key:'Short PR < 120 ms. Delta wave. Broad QRS. Accessory conduction pathway.'},
+  {name:'Long QT Syndrome',fn:lqtBeat,cat:'Channelopathy',hr:'60–80',sev:'WARNING',pr:'Normal',qrs:'Normal',rhythm:'Regular (long QT)',
+   feats:['QTc > 500 ms (Bazett formula)','Prominent U wave (may fuse with T)','T-wave morphology changes (notched, bifid)','Risk of Torsades de Pointes → VF'],
+   clinical:'Avoid QT-prolonging drugs (CredibleMeds registry). Correct electrolytes (K⁺, Mg²⁺). Beta-blockers (nadolol). ICD if high risk. Genetic testing.',
+   key:'QTc > 500 ms. Prominent U wave. Risk of Torsades de Pointes.'},
+];
+
+/* ── Page routing ── */
+let currentPage='home';
+function showPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  currentPage=id;
+  if(id==='home'){window.scrollTo(0,0);}
+  // Swap nav button
+  const btn=document.getElementById('analyserNavBtn');
+  if(id==='analyser'){btn.textContent='← Home';btn.onclick=()=>showPage('home');}
+  else{btn.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,12 6,12 8,5 10,19 12,11 14,13 16,12 22,12"/></svg>Open Analyser';btn.onclick=()=>openAnalyser(0);}
+}
+function scrollToSection(id){const el=document.getElementById(id);if(el)el.scrollIntoView({behavior:'smooth'});}
+
+/* ── Hero ECG ── */
+let heroOff=0;
+function drawHero(){
+  const c=document.getElementById('heroEcg');if(!c)return;
+  const W=c.clientWidth,H=c.clientHeight;
+  if(c.width!==W||c.height!==H){c.width=W;c.height=H;}
+  const ctx=c.getContext('2d');ctx.clearRect(0,0,W,H);
+  const seg=normalBeat(72).slice(0,Math.floor(FS*4));
+  ctx.beginPath();ctx.strokeStyle='#2dd4bf';ctx.lineWidth=1.5;
+  ctx.shadowColor='rgba(45,212,191,0.5)';ctx.shadowBlur=6;
+  for(let i=0;i<W;i++){const si=Math.floor(((i+heroOff)%seg.length));const y=H/2-seg[si]*(H*0.28);i===0?ctx.moveTo(i,y):ctx.lineTo(i,y);}
+  ctx.stroke();heroOff=(heroOff+1.5)%seg.length;requestAnimationFrame(drawHero);
+}
+window.addEventListener('load',()=>setTimeout(drawHero,120));
+
+/* ── Anatomy chart ── */
+let anatomyBuilt=false;
+function buildAnatomy(){
+  if(anatomyBuilt)return;anatomyBuilt=true;
+  const n=Math.floor(FS*1.4),ph=ls(0,1,n);
+  let sig=comps(ph,[[0.15,0.12,0.022],[-0.09,0.22,0.008],[1.20,0.265,0.009],[-0.30,0.305,0.008],[0.28,0.50,0.055]]);
+  sig=noise(sig,36);
+  new Chart(document.getElementById('anatomyChart'),{type:'line',data:{labels:ls(0,1.4,n).map(v=>v.toFixed(3)),datasets:[{data:sig,borderColor:'#2dd4bf',borderWidth:2,pointRadius:0,tension:0.3,fill:false}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false},tooltip:{enabled:false}},scales:{x:{grid:{color:'rgba(45,212,191,0.07)'},ticks:{color:'rgba(148,163,184,0.4)',maxTicksLimit:7,font:{family:"'DM Mono'",size:9}},border:{color:'rgba(45,212,191,0.1)'}},y:{grid:{color:'rgba(45,212,191,0.07)'},ticks:{color:'rgba(148,163,184,0.4)',font:{family:"'DM Mono'",size:9}},min:-0.5,max:1.6,border:{color:'rgba(45,212,191,0.1)'}}}}});
+}
+
+/* ── Downsample ── */
+const dss=(arr,n)=>{const f=Math.floor(arr.length/n);return Array.from({length:n},(_,i)=>arr[i*f]);};
+
+/* ── Conditions grid ── */
+let miniBuilt=new Set();
+function buildCondGrid(){
+  const g=document.getElementById('condGrid');g.innerHTML='';
+  CONDS.forEach((c,i)=>{
+    const cc=CAT_C[c.cat],sc=SEV_C[c.sev];
+    const el=document.createElement('div');el.className='cond-card';
+    el.innerHTML=`<div class="cond-card-top"><div class="cond-sev" style="color:${sc}"><div class="sev-dot" style="background:${sc}"></div>${c.sev}</div><div class="cond-cat">${c.cat}</div></div><div class="cond-name">${c.name}</div><div class="cond-key">${c.key}</div><div class="cond-mini"><canvas id="mini${i}"></canvas></div><div class="cond-card-border" style="background:${cc}"></div>`;
+    el.onclick=()=>openAnalyser(i);
+    g.appendChild(el);
+    setTimeout(()=>{
+      if(miniBuilt.has(i))return;miniBuilt.add(i);
+      new Chart(document.getElementById('mini'+i),{type:'line',data:{labels:dss(c.fn(),180).map((_,j)=>j),datasets:[{data:dss(c.fn(),180),borderColor:cc,borderWidth:1.3,pointRadius:0,tension:0.3,fill:false}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false},tooltip:{enabled:false}},scales:{x:{display:false},y:{display:false,min:-1.7,max:2.0}}}});
+    },40+i*25);
+  });
+}
+
+/* ── Overview chart ── */
+function buildOverview(){
+  const sevOrd={NORMAL:1,MILD:2,WARNING:3,ARRHYTHMIA:4,CRITICAL:5,FATAL:6};
+  new Chart(document.getElementById('overviewChart'),{type:'bar',data:{labels:CONDS.map(c=>c.name.length>17?c.name.slice(0,16)+'…':c.name),datasets:[{data:CONDS.map(c=>sevOrd[c.sev]),backgroundColor:CONDS.map(c=>SEV_C[c.sev]+'44'),borderColor:CONDS.map(c=>SEV_C[c.sev]),borderWidth:1.5,borderRadius:2}]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:700},indexAxis:'y',plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' '+CONDS[ctx.dataIndex].sev}}},scales:{x:{display:false,min:0,max:7},y:{ticks:{color:'#4b5e78',font:{family:"'DM Mono'",size:10}},grid:{display:false},border:{display:false}}}}});
+}
+
+/* ── Analyser ── */
+let activeCond=0,aMainChart=null,aRrChart=null;
+
+function openAnalyser(idx){
+  activeCond=idx;
+  showPage('analyser');
+  buildAnalyserSidebar('');
+  renderAnalyser();
+}
+
+function buildAnalyserSidebar(filter){
+  const list=document.getElementById('aCondList');list.innerHTML='';
+  const groups={};
+  CONDS.forEach((c,i)=>{
+    if(filter&&!c.name.toLowerCase().includes(filter.toLowerCase()))return;
+    if(!groups[c.cat])groups[c.cat]=[];groups[c.cat].push({c,i});
+  });
+  Object.entries(groups).forEach(([cat,items])=>{
+    const h=document.createElement('div');h.className='a-cat-head';h.textContent=cat;list.appendChild(h);
+    items.forEach(({c,i})=>{
+      const btn=document.createElement('button');
+      btn.className='a-cond-btn'+(i===activeCond?' active':'');
+      btn.id='acb'+i;
+      btn.innerHTML=`<span class="a-cdot" style="background:${SEV_C[c.sev]}"></span><span class="a-cname">${c.name}</span><span class="a-stag" style="background:${SEV_BG[c.sev]};color:${SEV_C[c.sev]}">${c.sev}</span>`;
+      btn.onclick=()=>{activeCond=i;document.querySelectorAll('.a-cond-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderAnalyser();};
+      list.appendChild(btn);
+    });
+  });
+}
+
+function filterConditions(val){buildAnalyserSidebar(val);}
+
+function renderAnalyser(){
+  const c=CONDS[activeCond];
+  const cc=CAT_C[c.cat],sc=SEV_C[c.sev];
+
+  document.getElementById('aTitle').textContent=c.name;
+  document.getElementById('aMeta').textContent=`CATEGORY: ${c.cat.toUpperCase()} · LEAD II · 25 mm/s · 10 mm/mV`;
+  document.getElementById('waveLabel').textContent=c.name;
+
+  const badge=document.getElementById('aSevBadge');
+  badge.textContent=c.sev;badge.style.background=SEV_BG[c.sev];badge.style.color=sc;badge.style.border=`1px solid ${sc}33`;
+
+  const hr=parseInt(c.hr)||72;
+  ['aHR','aPR','aQRS','aRhythm'].forEach(id=>document.getElementById(id).style.color=cc);
+  document.getElementById('aHR').textContent=hr;
+  document.getElementById('aPR').textContent=c.pr.replace(' ms','').trim();
+  document.getElementById('aQRS').textContent=c.qrs.replace(' ms','').trim();
+  document.getElementById('aRhythm').textContent=c.rhythm;
+
+  document.getElementById('aFeats').innerHTML=c.feats.map(f=>`<div class="feat-item">${f}</div>`).join('');
+  document.getElementById('aKey').textContent=c.key;
+  document.getElementById('aClinical').textContent=c.clinical;
+  document.getElementById('aParams').innerHTML=[
+    ['Heart rate',c.hr+' bpm'],['PR interval',c.pr],['QRS duration',c.qrs],['Rhythm',c.rhythm],['Category',c.cat],['Severity',c.sev]
+  ].map(([l,v],i)=>`<div class="param-trow"><span class="param-lbl">${l}</span><span class="param-val" style="color:${i>=4?cc:'var(--ink)'}">${v}</span></div>`).join('');
+
+  // Waveform chart
+  const raw=c.fn(),data=dss(raw,900),lbs=Array.from({length:900},(_,i)=>(i*DUR/900).toFixed(2));
+  if(aMainChart)aMainChart.destroy();
+  aMainChart=new Chart(document.getElementById('aEcgChart'),{type:'line',data:{labels:lbs,datasets:[{data,borderColor:cc,borderWidth:1.5,pointRadius:0,tension:0.25,fill:false}]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},plugins:{legend:{display:false},tooltip:{enabled:false}},scales:{x:{grid:{color:'rgba(45,212,191,0.06)'},ticks:{color:'rgba(75,94,120,0.8)',maxTicksLimit:6,font:{family:"'DM Mono'",size:9}},border:{color:'rgba(45,212,191,0.12)'}},y:{grid:{color:'rgba(45,212,191,0.06)'},ticks:{color:'rgba(75,94,120,0.8)',font:{family:"'DM Mono'",size:9}},min:-1.7,max:2.0,border:{color:'rgba(45,212,191,0.12)'}}}}});
+
+  // RR histogram
+  const baseRR=Math.round(60000/hr);
+  let rrV;
+  if(c.sev==='ARRHYTHMIA'&&c.name.includes('Fibrillation'))rrV=Array.from({length:40},()=>Math.round(baseRR*(0.4+Math.random()*1.6)));
+  else if(c.sev==='FATAL')rrV=Array.from({length:40},()=>Math.round(80+Math.random()*320));
+  else rrV=Array.from({length:40},()=>Math.round(baseRR*(0.93+Math.random()*0.14)));
+  const mn=Math.min(...rrV),mx=Math.max(...rrV),bw=Math.max((mx-mn)/8,40);
+  const cnts=new Array(8).fill(0);
+  rrV.forEach(v=>{const b=Math.min(Math.floor((v-mn)/bw),7);cnts[b]++;});
+  if(aRrChart)aRrChart.destroy();
+  aRrChart=new Chart(document.getElementById('aRrChart'),{type:'bar',data:{labels:Array.from({length:8},(_,i)=>Math.round(mn+i*bw)+''),datasets:[{data:cnts,backgroundColor:cc+'40',borderColor:cc,borderWidth:1,borderRadius:2}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`Count: ${c.raw}`}}},scales:{x:{ticks:{color:'#4b5e78',font:{family:"'DM Mono'",size:9}},grid:{display:false}},y:{ticks:{color:'#4b5e78',font:{family:"'DM Mono'",size:9},stepSize:1},grid:{color:'rgba(255,255,255,0.04)'}}}}});
+}
+
+/* ── Intersection reveal ── */
+const obs=new IntersectionObserver(entries=>{
+  entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');obs.unobserve(e.target);}});
+},{threshold:0.1});
+document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));
+
+/* ── Init ── */
+buildCondGrid();
+buildOverview();
+// Lazy anatomy on scroll
+const anatomyObs=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting){buildAnatomy();anatomyObs.disconnect();}});},{threshold:0.1});
+const aboutSec=document.getElementById('about');if(aboutSec)anatomyObs.observe(aboutSec);
+</script>
+</body>
+</html>
