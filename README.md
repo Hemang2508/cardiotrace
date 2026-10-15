@@ -1,4 +1,5 @@
 # CardioTrace
+[![DOI](https://zenodo.org/badge/1420285431.svg)](https://doi.org/10.5281/zenodo.23387336)
 
 **A web-based ECG simulator for fifteen cardiac rhythms, built on a parametric Gaussian model.**
 
@@ -41,7 +42,7 @@ This repository accompanies the paper *ECG Simulator for Cardiac Rhythm Visualis
 
 ## Citing this software
 
-If you use CardioTrace, please cite the archived release on Zenodo (DOI badge to be added after the first release). Citation metadata is also available in `CITATION.cff`.
+   If you use CardioTrace, please cite the archived release on Zenodo: https://doi.org/10.5281/zenodo.23387337. Citation metadata is also available in `CITATION.cff`.
 
 ## License
 
