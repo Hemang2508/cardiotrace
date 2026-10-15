@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata below."
+title: "CardioTrace: A Web-Based ECG Simulator for Cardiac Rhythm Visualisation"
+type: software
+authors:
+  - family-names: Joshi
+    given-names: Hemang
+    affiliation: Woxsen University
+version: 1.0.0
+license: MIT
+repository-code: "https://github.com/Hemang2508/cardiotrace"
+url: "https://eloquent-crisp-493f47.netlify.app/"
+abstract: >-
+  Web-based ECG simulator that generates fifteen cardiac rhythms using a
+  parametric Gaussian superposition model, for ECG education, algorithm
+  benchmarking and synthetic data generation.
+keywords:
+  - electrocardiogram
+  - ECG simulation
+  - cardiac arrhythmia
+  - Gaussian parametric model
+  - medical education
