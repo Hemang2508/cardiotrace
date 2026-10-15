@@ -5,8 +5,24 @@ type: software
 authors:
   - family-names: Joshi
     given-names: Hemang
-    affiliation: Woxsen University
+    affiliation: "Woxsen University, School of Business"
+  - family-names: Pathak
+    given-names: Sakshi
+    affiliation: "Woxsen University, School of Business"
+  - family-names: Joshi
+    given-names: Shyam
+    affiliation: "Woxsen University, AI Research Centre"
+  - family-names: Rengasamy
+    given-names: Elango
+    affiliation: "Woxsen University, AI Research Centre"
+  - family-names: Rathee
+    given-names: Sarita
+    affiliation: "Manipal University Jaipur, Department of Electronics and Communication Engineering"
+  - family-names: Kumar
+    given-names: Ajay
+    affiliation: "Manipal University Jaipur, Department of Mechanical Engineering"
 version: 1.0.0
+doi: 10.5281/zenodo.23387337
 license: MIT
 repository-code: "https://github.com/Hemang2508/cardiotrace"
 url: "https://eloquent-crisp-493f47.netlify.app/"
