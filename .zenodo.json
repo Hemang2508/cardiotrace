@@ -5,10 +5,12 @@
   "version": "1.0.0",
   "license": "MIT",
   "creators": [
-    {
-      "name": "Joshi, Hemang",
-      "affiliation": "Woxsen University"
-    }
+    { "name": "Joshi, Hemang", "affiliation": "Woxsen University, School of Business" },
+    { "name": "Pathak, Sakshi", "affiliation": "Woxsen University, School of Business" },
+    { "name": "Joshi, Shyam", "affiliation": "Woxsen University, AI Research Centre" },
+    { "name": "Rengasamy, Elango", "affiliation": "Woxsen University, AI Research Centre" },
+    { "name": "Rathee, Sarita", "affiliation": "Manipal University Jaipur, Department of Electronics and Communication Engineering" },
+    { "name": "Kumar, Ajay", "affiliation": "Manipal University Jaipur, Department of Mechanical Engineering" }
   ],
   "keywords": [
     "electrocardiogram",
